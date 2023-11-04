@@ -39,8 +39,8 @@ Ref.get(ref)
 use Reactive
 ref = Ref.new(2)
 ref_squared = reactive do
-...>   get(ref) ** 2
-...> end
+  get(ref) ** 2
+end
 Reactive.get(ref_squared)
 # 4
 Ref.set(ref, 3)
@@ -73,19 +73,19 @@ Reactive.get(computed)
 Now, updating `if_false` will not require a recomputation:
 
 ```elixir
-iex> Ref.set(if_false, 0)
-:ok
-iex> Reactive.get_cached(computed)
-2
+Ref.set(if_false, 0)
+# :ok
+Reactive.get_cached(computed)
+# 2
 ```
 
 Updating `if_true` will now require a recomputation:
 
 ```elixir
-iex> Ref.set(if_true, 3)
-:ok
-iex> Reactive.get_cached(computed)
-:stale
-iex> Reactive.get(computed)
-3
+Ref.set(if_true, 3)
+# :ok
+Reactive.get_cached(computed)
+# :stale
+Reactive.get(computed)
+# 3
 ```
