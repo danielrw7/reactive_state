@@ -9,7 +9,7 @@ defmodule Reactive do
   ```elixir
   def deps do
     [
-      {:reactive_state, "~> 0.1.0"}
+      {:reactive_state, "~> 0.1.1"}
     ]
   end
   ```
@@ -135,7 +135,8 @@ defmodule Reactive do
       Reactive.new(fn call_id ->
         var!(get) = fn ref -> Reactive.Ref.get(ref, call_id) end
         [do: value] = unquote(Reactive.Macro.traverse(ast))
-        var!(get) # suppress unused variable warning
+        # suppress unused variable warning
+        var!(get)
         value
       end)
     end

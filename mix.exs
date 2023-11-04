@@ -4,10 +4,11 @@ defmodule Reactive.MixProject do
   def project do
     [
       app: :reactive_state,
-      version: "0.1.0",
+      version: "0.1.1",
       elixir: "~> 1.14",
       deps: deps(),
-      description: "A simple library for creating and managing reactive state through GenServer processes",
+      description:
+        "A simple library for creating and managing reactive state through GenServer processes",
       package: [
         licenses: ["MIT"],
         links: %{}
@@ -26,7 +27,7 @@ defmodule Reactive.MixProject do
 
   defp deps do
     [
-      {:ex_doc, "~> 0.27", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.27", only: :dev, runtime: false}
     ]
   end
 end

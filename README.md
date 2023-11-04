@@ -9,7 +9,7 @@ The package can be installed by adding `reactive_state` to your list of dependen
 ```elixir
 def deps do
   [
-    {:reactive_state, "~> 0.1.0"}
+    {:reactive_state, "~> 0.1.1"}
   ]
 end
 ```
