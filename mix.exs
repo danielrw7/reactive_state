@@ -13,7 +13,10 @@ defmodule Reactive.MixProject do
         links: %{}
       ],
       name: "Reactive State",
-      source_url: "https://github.com/danielrw7/reactive_state"
+      source_url: "https://github.com/danielrw7/reactive_state",
+      docs: [
+        main: "Reactive"
+      ]
     ]
   end
 

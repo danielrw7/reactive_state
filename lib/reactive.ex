@@ -2,6 +2,18 @@ defmodule Reactive do
   @moduledoc """
   Module to manage reactive state by using GenServer processes ("reactive process" from here on) to manage each piece of state and its relationships to other reactive processes
 
+  ## Installation
+
+  The package can be installed by adding `reactive_state` to your list of dependencies in `mix.exs`:
+
+  ```elixir
+  def deps do
+    [
+      {:reactive_state, "~> 0.1.0"}
+    ]
+  end
+  ```
+
   ## Examples
 
   ### Working with data directly with `Reactive.Ref`
