@@ -25,10 +25,8 @@ defmodule Reactive.Ref do
       iex> Ref.get(ref)
       0
   """
-  def new(value) do
-    pid = Reactive.new(fn _ -> value end)
-    Reactive.get(pid)
-    pid
+  def new(value, opts \\ []) do
+    Reactive.new(fn _ -> value end, opts)
   end
 
   @doc """
@@ -62,7 +60,7 @@ defmodule Reactive.Ref do
       1
   """
   def set_fn(pid, value) when is_function(value) do
-    existing = Reactive.get_cached(pid)
+    existing = Reactive.get(pid)
     new_value = value.(existing)
 
     if new_value !== existing do
