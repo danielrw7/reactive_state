@@ -21,53 +21,53 @@ defmodule ReactiveTest do
   doctest Reactive
   doctest Reactive.Ref
 
-  # test "invalidate" do
-  #   first = Ref.new(0)
-  #   second = Ref.new(0)
-  #   branch = Ref.new(true)
+  test "invalidate" do
+    first = Ref.new(0)
+    second = Ref.new(0)
+    branch = Ref.new(true)
 
-  #   computed =
-  #     reactive do
-  #       if get(branch) do
-  #         get(first)
-  #       else
-  #         get(second)
-  #       end
-  #     end
+    computed =
+      reactive do
+        if get(branch) do
+          get(first)
+        else
+          get(second)
+        end
+      end
 
-  #   Reactive.get(computed)
-  #   assert :stale != Reactive.get_cached(computed)
-  #   Ref.set(first, 1)
-  #   assert :stale == Reactive.get_cached(computed)
+    Reactive.get(computed)
+    assert :stale != Reactive.get_cached(computed)
+    Ref.set(first, 1)
+    assert :stale == Reactive.get_cached(computed)
 
-  #   Reactive.get(computed)
-  #   Ref.set(branch, false)
-  #   assert :stale == Reactive.get_cached(computed)
-  #   Reactive.get(computed)
-  #   assert :stale != Reactive.get_cached(computed)
-  #   Ref.set(first, 2)
-  #   assert :stale != Reactive.get_cached(computed)
+    Reactive.get(computed)
+    Ref.set(branch, false)
+    assert :stale == Reactive.get_cached(computed)
+    Reactive.get(computed)
+    assert :stale != Reactive.get_cached(computed)
+    Ref.set(first, 2)
+    assert :stale != Reactive.get_cached(computed)
 
-  #   Reactive.get(computed)
-  #   Ref.set(second, 1)
-  #   assert :stale == Reactive.get_cached(computed)
-  # end
+    Reactive.get(computed)
+    Ref.set(second, 1)
+    assert :stale == Reactive.get_cached(computed)
+  end
 
-  # test "restart" do
-  #   ref = Ref.new(0)
-  #   DynamicSupervisor.terminate_child(Reactive.Supervisor, ref)
-  #   val = Ref.get(ref)
-  #   assert 0 == val
-  # end
+  test "restart" do
+    ref = Ref.new(0)
+    DynamicSupervisor.terminate_child(Reactive.Supervisor, ref)
+    val = Ref.get(ref)
+    assert 0 == val
+  end
 
-  # test "resolve_process" do
-  #   ref = Ref.new(0)
-  #   assert ref == Reactive.resolve_process(ref)
-  #   DynamicSupervisor.terminate_child(Reactive.Supervisor, ref)
-  #   assert !alive?(ref)
-  #   assert Reactive.resolve_process(ref, create: true) |> Process.alive?()
-  #   assert 0 == Ref.get(ref)
-  # end
+  test "resolve_process" do
+    ref = Ref.new(0)
+    assert ref == Reactive.resolve_process(ref)
+    DynamicSupervisor.terminate_child(Reactive.Supervisor, ref)
+    assert !alive?(ref)
+    assert Reactive.resolve_process(ref, create: true) |> Process.alive?()
+    assert 0 == Ref.get(ref)
+  end
 
   test "gc" do
     first = Ref.new(0, name: :first)
