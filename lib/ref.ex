@@ -50,7 +50,6 @@ defmodule Reactive.Ref do
     end
   end
 
-
   @doc """
   Set the state for a reactive process through a function that receives the old value
 
@@ -70,7 +69,6 @@ defmodule Reactive.Ref do
       Reactive.set(pid, fn _ -> new_value end)
     end
   end
-
 
   @doc """
   Retrieve the state of a reactive process

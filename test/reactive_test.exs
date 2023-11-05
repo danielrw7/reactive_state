@@ -9,13 +9,14 @@ defmodule ReactiveTest do
     second = Ref.new(0)
     branch = Ref.new(true)
 
-    computed = reactive do
-      if get(branch) do
-        get(first)
-      else
-        get(second)
+    computed =
+      reactive do
+        if get(branch) do
+          get(first)
+        else
+          get(second)
+        end
       end
-    end
 
     Reactive.get(computed)
     assert :stale != Reactive.get_cached(computed)
