@@ -113,7 +113,7 @@ defmodule Reactive do
       iex> use Reactive
       iex> ref = Ref.new(2)
       iex> ref_squared = Reactive.new(fn call_id ->
-      ...>   Reactive.get(ref, call_id) ** 2
+      ...>   Reactive.get(ref, call_id: call_id) ** 2
       ...> end)
       iex> Reactive.get(ref_squared)
       4
@@ -201,7 +201,7 @@ defmodule Reactive do
       iex> use Reactive
       iex> ref = Ref.new(2)
       iex> ref_squared = Reactive.new(fn call_id ->
-      ...>   Reactive.get(ref, call_id) ** 2
+      ...>   Reactive.get(ref, call_id: call_id) ** 2
       ...> end)
       iex> Reactive.get(ref_squared)
       4
@@ -225,7 +225,7 @@ defmodule Reactive do
     quote do
       Reactive.new(
         fn call_id ->
-          var!(get) = fn ref -> Reactive.Ref.get(ref, call_id) end
+          var!(get) = fn ref -> Reactive.Ref.get(ref, call_id: call_id) end
           value = unquote(Reactive.Macro.traverse(ast))
           # suppress unused variable warning
           var!(get)
@@ -273,25 +273,16 @@ defmodule Reactive do
       iex> Reactive.get(ref)
       0
   """
-  def get(pid) do
-    Reactive.call(pid, {:get_dry})
-  end
+  def get(pid, opts \\ []) do
+    if opts[:counter] != false do
+      Reactive.ETS.counter(Reactive.ETS.Counter, pid)
+    end
 
-  @doc """
-  Retrieve the state of a reactive process, and register the current process as dependent of that process, with the call ID of the current process.
-  You should use the `Reactive.reactive` macro to manage reactive relationships instead
-
-  ## Example
-
-      iex> use Reactive
-      iex> ref = reactive do
-      ...>   0
-      ...> end
-      iex> Reactive.get(ref)
-      0
-  """
-  def get(pid, call_id) when is_integer(call_id) do
-    Reactive.call(pid, {:get, call_id})
+    if opts[:call_id] do
+      Reactive.call(pid, {:get, opts[:call_id]})
+    else
+      Reactive.call(pid, {:get_dry})
+    end
   end
 
   @doc """
@@ -363,9 +354,9 @@ defmodule Reactive do
       listeners: %{}
     }
 
-    if opts[:immediate] do
+    if opts[:proactive] do
       if name == self() do
-        Reactive.ETS.set(Reactive.ETS.Immediate, :process, name)
+        Reactive.ETS.set(Reactive.ETS.ProcessOpts, :proactive, name)
       end
 
       {
@@ -401,7 +392,7 @@ defmodule Reactive do
       },
       {
         :continue,
-        case opts[:immediate] do
+        case opts[:proactive] do
           true -> {:compute, {from, :ok}}
           _ -> {:mark_listeners_stale, {from, :ok}}
         end

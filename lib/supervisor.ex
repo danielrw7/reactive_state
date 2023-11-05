@@ -20,7 +20,7 @@ defmodule Reactive.Supervisor do
   def gc(opts \\ []) do
     name = Keyword.get(opts, :name, Reactive.Supervisor)
     count = Keyword.get(opts, :count)
-    random = Keyword.get(opts, :count, true)
+    strategy = Keyword.get(opts, :strategy, :usage)
 
     protect =
       case opts[:protect] do
@@ -39,7 +39,7 @@ defmodule Reactive.Supervisor do
       end
 
     children =
-      case {count, random} do
+      case {count, strategy} do
         {nil, _} -> children
         {count, true} -> Enum.take_random(children, count)
         {count, _} -> Enum.take(children, count)
@@ -52,12 +52,12 @@ defmodule Reactive.Supervisor do
     end
   end
 
-  def trigger_immediate(opts \\ []) do
+  def trigger_proactive(opts \\ []) do
     exclude = opts[:exclude]
 
     processes =
-      Keyword.get(opts, :name, Reactive.ETS.Immediate)
-      |> Reactive.ETS.get_all(:process)
+      Keyword.get(opts, :name, Reactive.ETS.ProcessOpts)
+      |> Reactive.ETS.get_all(:proactive)
       |> Stream.map(&Reactive.resolve_process(&1 |> elem(1), create: true))
       |> Enum.filter(& &1)
 
@@ -65,14 +65,14 @@ defmodule Reactive.Supervisor do
       nil -> processes
       _ -> processes |> Enum.filter(&(!MapSet.member?(exclude, &1)))
     end
-    |> trigger_immediate_call(Keyword.get(opts, :times, 1))
+    |> trigger_proactive_call(Keyword.get(opts, :times, 1))
   end
 
-  def trigger_immediate_call(processes, times \\ 1)
+  def trigger_proactive_call(processes, times \\ 1)
 
-  def trigger_immediate_call(_processes, 0), do: false
+  def trigger_proactive_call(_processes, 0), do: false
 
-  def trigger_immediate_call(processes, times) do
+  def trigger_proactive_call(processes, times) do
     any_changed =
       for pid <- processes do
         Reactive.compute_if_needed(pid)
@@ -81,7 +81,7 @@ defmodule Reactive.Supervisor do
       |> Enum.any?()
 
     if any_changed do
-      trigger_immediate_call(processes, times - 1)
+      trigger_proactive_call(processes, times - 1)
       any_changed
     end
   end

@@ -9,6 +9,8 @@ defmodule ReactiveTest do
   end
 
   setup do
+    Reactive.ETS.empty()
+
     for {_, pid, _, _} <- DynamicSupervisor.which_children(Reactive.Supervisor) do
       DynamicSupervisor.terminate_child(Reactive.Supervisor, pid)
     end
@@ -125,20 +127,33 @@ defmodule ReactiveTest do
     assert alive?(ref)
   end
 
-  test "immediate" do
+  test "proactive" do
     use Reactive
     num = Ref.new(0)
 
     ref =
-      reactive immediate: true do
+      reactive proactive: true do
         get(num) + 1
       end
 
     assert 1 == Reactive.get_cached(ref)
 
     Ref.set(num, 1)
-    Reactive.Supervisor.trigger_immediate()
+    Reactive.Supervisor.trigger_proactive()
     assert 2 == Reactive.get_cached(ref)
+  end
+
+  test "counters" do
+    x = Ref.new(0)
+    assert nil == Reactive.ETS.get(Reactive.ETS.Counter, x)
+    Ref.get(x)
+    assert 1 == Reactive.ETS.get(Reactive.ETS.Counter, x)
+    Ref.get(x)
+    assert 2 == Reactive.ETS.get(Reactive.ETS.Counter, x)
+
+    # get_cached does not update counter
+    Reactive.get_cached(x)
+    assert 2 == Reactive.ETS.get(Reactive.ETS.Counter, x)
   end
 
   def alive?(pid) do

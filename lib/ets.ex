@@ -2,7 +2,8 @@ defmodule Reactive.ETS do
   def ensure_started do
     ensure_started(Reactive.ETS.Method)
     ensure_started(Reactive.ETS.Process)
-    ensure_started(Reactive.ETS.Immediate, [:bag, :public])
+    ensure_started(Reactive.ETS.ProcessOpts, [:bag, :public])
+    ensure_started(Reactive.ETS.Counter, [:ordered_set, :public])
   end
 
   def ensure_started(name, opts \\ [:set, :public]) do
@@ -15,10 +16,10 @@ defmodule Reactive.ETS do
     {:ok, id}
   end
 
-  def get(name, key) do
+  def get(name, key, default \\ nil) do
     case :ets.lookup(name, key) do
       [{_, value}] -> value
-      [] -> nil
+      [] -> default
     end
   end
 
@@ -28,5 +29,23 @@ defmodule Reactive.ETS do
 
   def set(name, key, value) do
     :ets.insert(name, {key, value})
+  end
+
+  def counter(name, key, value \\ 1, default \\ 0) do
+    :ets.update_counter(name, key, value, {key, default})
+  end
+
+  def empty do
+    empty(Reactive.ETS.Method)
+    empty(Reactive.ETS.Process)
+    empty(Reactive.ETS.ProcessOpts)
+    empty(Reactive.ETS.Counter)
+  end
+
+  def empty(name) do
+    case :ets.whereis(name) do
+      :undefined -> nil
+      _ -> :ets.delete_all_objects(name)
+    end
   end
 end

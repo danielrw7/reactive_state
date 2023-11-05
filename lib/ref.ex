@@ -81,22 +81,7 @@ defmodule Reactive.Ref do
       iex> Ref.get(ref)
       0
   """
-  def get(pid) do
-    Reactive.get(pid)
-  end
-
-  @doc """
-  Retrieve the state of a reactive process, and register the current process as dependent of that process, with the call ID of the current process.
-  You should use the `Reactive.reactive` macro to manage reactive relationships instead
-
-  ## Example
-
-      iex> use Reactive
-      iex> ref = Ref.new(0)
-      iex> Ref.get(ref)
-      0
-  """
-  def get(pid, call_id) when is_integer(call_id) do
-    Reactive.get(pid, call_id)
+  def get(pid, opts \\ []) do
+    Reactive.get(pid, opts)
   end
 end
