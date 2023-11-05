@@ -466,7 +466,7 @@ defmodule Reactive do
   @doc false
   @impl true
   def handle_call({:can_gc?}, _, %Reactive{state: :stale, opts: opts} = full_state) do
-    {:reply, Keyword.get(opts, :gc, true), full_state} |> dbg()
+    {:reply, Keyword.get(opts, :gc, true), full_state}
   end
 
   @impl true

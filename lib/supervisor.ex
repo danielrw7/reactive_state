@@ -47,7 +47,7 @@ defmodule Reactive.Supervisor do
 
     for {_, child, _, _} <- children do
       if Reactive.can_gc?(child) do
-        {child, DynamicSupervisor.terminate_child(Reactive.Supervisor, child)} |> dbg()
+        DynamicSupervisor.terminate_child(Reactive.Supervisor, child)
       end
     end
   end
