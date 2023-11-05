@@ -96,6 +96,7 @@ defmodule Reactive do
     with {:ok, pid} <- GenServer.start_link(__MODULE__, args) do
       name = name || pid
 
+      Reactive.ETS.ensure_started()
       Reactive.ETS.set(Reactive.ETS.Method, name, method)
 
       if name != pid do
@@ -119,6 +120,10 @@ defmodule Reactive do
   """
   def new(method, opts \\ []) when is_function(method) do
     name = opts[:name]
+
+    if !opts[:supervisor] do
+      Reactive.Supervisor.ensure_started()
+    end
 
     supervisor_pid =
       case Keyword.get(opts, :supervisor, Reactive.Supervisor) do

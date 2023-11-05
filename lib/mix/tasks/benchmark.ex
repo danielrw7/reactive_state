@@ -68,7 +68,6 @@ defmodule Mix.Tasks.Benchmark do
 
     Benchmark.measure "total" do
       {:ok, _} = Reactive.Supervisor.ensure_started()
-      {:ok, _} = Reactive.ETS.ensure_started()
       # {:ok, _} = Reactive.Supervisor.ensure_started()
       first = Ref.new(1, name: "ref_#{count}")
 

@@ -4,9 +4,7 @@ defmodule ReactiveTest do
   use Reactive
 
   setup_all do
-    {:ok, _} = Reactive.Supervisor.ensure_started()
-    {:ok, _} = Reactive.ETS.ensure_started()
-
+    Reactive.Supervisor.ensure_started()
     :ok
   end
 
@@ -22,6 +20,7 @@ defmodule ReactiveTest do
   doctest Reactive.Ref
 
   test "invalidate" do
+    use Reactive
     first = Ref.new(0)
     second = Ref.new(0)
     branch = Ref.new(true)
@@ -54,6 +53,7 @@ defmodule ReactiveTest do
   end
 
   test "restart" do
+    use Reactive
     ref = Ref.new(0)
     DynamicSupervisor.terminate_child(Reactive.Supervisor, ref)
     val = Ref.get(ref)
@@ -61,6 +61,7 @@ defmodule ReactiveTest do
   end
 
   test "resolve_process" do
+    use Reactive
     ref = Ref.new(0)
     assert ref == Reactive.resolve_process(ref)
     DynamicSupervisor.terminate_child(Reactive.Supervisor, ref)
@@ -70,6 +71,7 @@ defmodule ReactiveTest do
   end
 
   test "gc" do
+    use Reactive
     first = Ref.new(0, name: :first)
     second = Ref.new(1, name: :second)
     branch = Ref.new(true, name: :branch)
@@ -124,6 +126,7 @@ defmodule ReactiveTest do
   end
 
   test "immediate" do
+    use Reactive
     num = Ref.new(0)
 
     ref =

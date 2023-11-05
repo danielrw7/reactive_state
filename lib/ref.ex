@@ -21,6 +21,7 @@ defmodule Reactive.Ref do
 
   ## Example
 
+      iex> use Reactive
       iex> ref = Ref.new(0)
       iex> Ref.get(ref)
       0
@@ -34,6 +35,7 @@ defmodule Reactive.Ref do
 
   ## Example
 
+      iex> use Reactive
       iex> ref = Ref.new(0)
       iex> Ref.set(ref, 1)
       :ok
@@ -53,6 +55,7 @@ defmodule Reactive.Ref do
 
   ## Example
 
+      iex> use Reactive
       iex> ref = Ref.new(0)
       iex> Ref.set_fn(ref, fn state -> state + 1 end)
       :ok
@@ -73,6 +76,7 @@ defmodule Reactive.Ref do
 
   ## Example
 
+      iex> use Reactive
       iex> ref = Ref.new(0)
       iex> Ref.get(ref)
       0
@@ -87,6 +91,7 @@ defmodule Reactive.Ref do
 
   ## Example
 
+      iex> use Reactive
       iex> ref = Ref.new(0)
       iex> Ref.get(ref)
       0
