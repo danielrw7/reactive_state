@@ -1,20 +1,24 @@
 defmodule Benchmark do
   @moduledoc false
 
-  defmacro measure(ast) do
+  defmacro measure(label, ast) do
     # https://stackoverflow.com/a/29674651
     quote do
-      fn -> unquote(ast) end
-      |> :timer.tc()
-      |> elem(0)
-      |> Kernel./(1_000_000)
+      method = fn -> unquote(ast) end
+
+      {time, [do: res]} = :timer.tc(method)
+
+      IO.puts("#{unquote(label)} took #{Kernel./(time, 1_000_000)}s")
+
+      res
     end
   end
 end
 
 defmodule Mix.Tasks.Benchmark do
-  @moduledoc "Printed when the user requests `mix benchmark`"
-  @shortdoc "Runs benchmarks"
+  @moduledoc false
+  # @moduledoc "Printed when the user requests `mix benchmark`"
+  # @shortdoc "Runs benchmarks"
 
   use Mix.Task
   use Reactive
@@ -53,7 +57,7 @@ defmodule Mix.Tasks.Benchmark do
     [last | _] = pids
 
     next =
-      reactive do
+      reactive name: "ref_#{i}" do
         get(last) + 1
       end
 
@@ -63,17 +67,52 @@ defmodule Mix.Tasks.Benchmark do
   def benchmark(count) do
     require Benchmark
 
-    seconds =
-      Benchmark.measure do
-        first = Ref.new(0)
+    Benchmark.measure "total" do
+      {:ok, _} = Reactive.Supervisor.ensure_started()
+      # {:ok, _} = Reactive.Supervisor.ensure_started()
+      first = Ref.new(1, name: "ref_#{count}")
 
-        [last | _] = recursive_reactive([first], count)
+      [last | rest] =
+        Benchmark.measure "create" do
+          recursive_reactive([first], count - 1)
+        end
 
+      Benchmark.measure "compute last" do
         true = Ref.get(last) == count
-        Ref.set(first, 1)
+      end
+
+      Benchmark.measure "recompute all" do
+        Ref.set(first, 2)
         true = Ref.get(last) == count + 1
       end
 
-    IO.puts("took #{seconds}s for #{count} recursively referenced cells")
+      Benchmark.measure "gc" do
+        Reactive.ETS.reset(Reactive.ETS.Counter)
+
+        rest
+        |> Enum.at(round(count / 2))
+        |> Ref.set_fn(&(&1 + 1))
+
+        Benchmark.measure "gc.recompute_last" do
+          Ref.get(last)
+        end
+
+        Benchmark.measure "gc.call" do
+          Reactive.Supervisor.gc()
+        end
+
+        Ref.get(last)
+
+        Benchmark.measure "gc.call" do
+          Reactive.Supervisor.gc()
+        end
+
+        Benchmark.measure "gc.call" do
+          Reactive.Supervisor.gc()
+        end
+
+        DynamicSupervisor.count_children(Reactive.Supervisor) |> dbg()
+      end
+    end
   end
 end
