@@ -73,7 +73,7 @@ defmodule Reactive do
   ## Supervisor
 
   By default, new reactive processes will be started under the DynamicSupervisor `Reactive.Supervisor`,
-  if that supervisor exists. If not, it will be created under the current process.
+  if that supervisor exists. If not, the reactive process will be created under the current process.
 
   To override this behavior, pass the `supervisor` keyword arg during process creation:
 
