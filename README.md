@@ -23,8 +23,6 @@ end
 
 ## Examples
 
-Module to manage reactive state by using GenServer processes ("reactive process" from here on) to manage each piece of state and its relationships to other reactive processes.
-
 ### Working with data directly with `Reactive.Ref`
 
 ```elixir
