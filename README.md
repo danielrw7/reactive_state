@@ -42,8 +42,10 @@ ref = Ref.new(2)
 ref_squared = reactive do
   get(ref) ** 2
 end
+
 Reactive.get(ref_squared)
 # 4
+
 Ref.set(ref, 3)
 Reactive.get(ref_squared)
 # 9
@@ -63,17 +65,20 @@ computed = reactive do
     get(if_false)
   end
 end
+
 Reactive.get(computed)
 # 1
 Ref.set(toggle, true)
 # :ok
 Reactive.get(computed)
 # 2
+
 # Now, updating `if_false` will not require a recomputation
 Ref.set(if_false, 0)
 # :ok
 Reactive.get_cached(computed)
 # 2
+
 # Updating `if_true` will require a recomputation
 Ref.set(if_true, 3)
 # :ok
@@ -129,6 +134,7 @@ Reactive processes can be protected with the `gc` option:application
 ```elixir
 use Reactive
 Reactive.Supervisor.ensure_started()
+
 ref = Ref.new(0, gc: false)
 Reactive.Supervisor.gc()
 ^ref = Reactive.resolve_process(ref)
@@ -147,13 +153,16 @@ Proactive reactive processes will not trigger immediately after a dependency cha
 ```elixir
 use Reactive
 Reactive.Supervisor.ensure_started()
+
 num = Ref.new(0)
 ref =
   reactive proactive: true do
     get(num) + 1
   end
+
 Reactive.get_cached(ref)
 # 1
+
 Ref.set(num, 1)
 Reactive.Supervisor.trigger_proactive()
 Reactive.get_cached(ref)
