@@ -11,15 +11,17 @@ defmodule ReactiveTest do
   setup do
     Reactive.ETS.empty()
 
-    for {_, pid, _, _} <- DynamicSupervisor.which_children(Reactive.Supervisor) do
-      DynamicSupervisor.terminate_child(Reactive.Supervisor, pid)
-    end
+    # for {_, pid, _, _} <- DynamicSupervisor.which_children(Reactive.Supervisor) do
+    #   DynamicSupervisor.terminate_child(Reactive.Supervisor, pid)
+    # end
 
     :ok
   end
 
   doctest Reactive
   doctest Reactive.Ref
+  doctest Reactive.Supervisor
+  doctest Reactive.ETS
 
   test "invalidate" do
     use Reactive

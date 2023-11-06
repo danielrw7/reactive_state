@@ -56,6 +56,7 @@ defmodule Reactive.Ref do
   ## Example
 
       iex> use Reactive
+      iex> Reactive.Supervisor.ensure_started()
       iex> ref = Ref.new(0)
       iex> Ref.set_fn(ref, fn state -> state + 1 end)
       :ok

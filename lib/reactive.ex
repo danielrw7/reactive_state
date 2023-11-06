@@ -1,6 +1,6 @@
 defmodule Reactive do
   @moduledoc """
-  Module to manage reactive state by using GenServer processes ("reactive process" from here on) to manage each piece of state and its relationships to other reactive processes
+  Module to manage reactive state by using GenServer processes ("reactive process" from here on) to manage each piece of state and its relationships to other reactive processes.
 
   ## Installation
 
@@ -14,11 +14,8 @@ defmodule Reactive do
   end
   ```
 
-  ## Examples
+  ## Working with data directly with `Reactive.Ref`
 
-  ### Working with data directly with `Reactive.Ref`
-
-      iex> use Reactive
       iex> ref = Ref.new(0) #PID<0.204.0>
       iex> Ref.get(ref) # or Ref.get(ref)
       0
@@ -27,7 +24,7 @@ defmodule Reactive do
       iex> Ref.get(ref)
       1
 
-  ### Reactive Block
+  ## Reactive Block
 
       iex> use Reactive
       iex> ref = Ref.new(2)
@@ -40,9 +37,10 @@ defmodule Reactive do
       iex> Reactive.get(ref_squared)
       9
 
-  #### Conditional Branches
+  ### Conditional Branches
 
       iex> use Reactive
+      iex> Reactive.Supervisor.ensure_started()
       iex> if_false = Ref.new(1)
       iex> if_true = Ref.new(2)
       iex> toggle = Ref.new(false)
@@ -71,6 +69,75 @@ defmodule Reactive do
       :stale
       iex> Reactive.get(computed)
       3
+
+  ## Supervisor
+
+  By default, new reactive processes will be started under the DynamicSupervisor `Reactive.Supervisor`,
+  if that supervisor exists. If not, it will be created under the current process.
+
+  To override this behavior, pass the `supervisor` keyword arg during process creation:
+
+      value = Ref.new(0, supervisor: MyApp.Supervisor)
+      ref = reactive supervisor: MyApp.Supervisor do
+        get(value) + 1
+      end
+
+  These examples include a method which automatically starts the supervisor for you (`Reactive.Supervisor.ensure_started`),
+  but you should set it up in your own supervision tree.
+
+  ## Process Restarting
+
+  If a reactive process has been killed for any reason, it will be restarted upon a `Reactive.get` or `Ref.get` call:
+
+      iex> Reactive.Supervisor.ensure_started()
+      iex> ref = Ref.new(0)
+      iex> DynamicSupervisor.terminate_child(Reactive.Supervisor, ref)
+      iex> Ref.get(ref)
+      0
+
+  ## Garbage Collection
+
+  The default garbage collection strategy is to kill any processes that were not accessed through
+  a `Reactive.get` or `Ref.get` call between GC calls:
+
+      iex> Reactive.Supervisor.ensure_started()
+      iex> ref = Ref.new(0)
+      iex> Reactive.Supervisor.gc()
+      iex> nil == Reactive.resolve_process(ref)
+
+  Reactive processes can be protected with the `gc` option:application
+
+      iex> use Reactive
+      iex> Reactive.Supervisor.ensure_started()
+      iex> ref = Ref.new(0, gc: false)
+      iex> Reactive.Supervisor.gc()
+      iex> ^ref = Reactive.resolve_process(ref)
+
+      iex> use Reactive
+      iex> Reactive.Supervisor.ensure_started()
+      iex> ref = reactive gc: false do
+      ...>    # some expensive computation
+      ...> end
+      iex> Reactive.Supervisor.gc()
+      iex> ^ref = Reactive.resolve_process(ref)
+
+  ## Proactive Process
+
+  Proactive reactive processes will not trigger immediately after a dependency changes; they must triggered with a call to `Reactive.Supervisor.trigger_proactive`
+
+      iex> use Reactive
+      iex> Reactive.Supervisor.ensure_started()
+      iex> num = Ref.new(0)
+      iex> ref =
+      ...>   reactive proactive: true do
+      ...>     get(num) + 1
+      ...>   end
+      iex> Reactive.get_cached(ref)
+      1
+      iex> Ref.set(num, 1)
+      iex> Reactive.Supervisor.trigger_proactive()
+      iex> Reactive.get_cached(ref)
+      2
   """
 
   defstruct [
@@ -124,10 +191,6 @@ defmodule Reactive do
   """
   def new(method, opts \\ []) when is_function(method) do
     name = opts[:name]
-
-    if opts[:supervisor] == nil do
-      Reactive.Supervisor.ensure_started()
-    end
 
     supervisor_pid =
       case Keyword.get(opts, :supervisor, Reactive.Supervisor) do
@@ -251,6 +314,7 @@ defmodule Reactive do
   Replace a reactive process's computation method
 
       iex> use Reactive
+      iex> Reactive.Supervisor.ensure_started()
       iex> ref = reactive do
       ...>   0
       ...> end

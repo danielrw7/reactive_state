@@ -1,4 +1,8 @@
 defmodule Reactive.Supervisor do
+  @moduledoc """
+  Default DynamicSupervisor to manage task creation and garbage collection.
+  """
+
   use DynamicSupervisor
 
   def start_link(init_arg) do
@@ -10,13 +14,52 @@ defmodule Reactive.Supervisor do
     DynamicSupervisor.init(strategy: :one_for_one)
   end
 
+  @doc "Start the supervisor if needed (not recommended)"
   def ensure_started do
-    case Process.whereis(Reactive.Supervisor) do
-      nil -> Supervisor.start_link([Reactive.Supervisor], strategy: :one_for_one)
-      pid -> {:ok, pid}
+    {exists, pid} =
+      case Process.whereis(Reactive.Supervisor) do
+        nil -> {false, nil}
+        pid -> {Process.alive?(pid), pid}
+      end
+
+    case exists do
+      false -> Supervisor.start_link([Reactive.Supervisor], strategy: :one_for_one)
+      _ -> {:ok, pid}
     end
   end
 
+  @doc """
+  Garbage collect processes for a supervisor (Reactive.Supervisor by default)
+
+  Options:
+  - name: [pid or alias] (default: `Reactive.Supervisor`)
+  - strategy: :counter (default `:counter`)
+  - count: [integer] (default `nil`)
+  - random: [boolean] (default `false`)
+
+  Example:
+
+      iex> Reactive.Supervisor.ensure_started()
+      iex> ref = Ref.new(0)
+      iex> Reactive.Supervisor.gc()
+      iex> nil == Reactive.resolve_process(ref)
+
+  Reactive processes can be protected with the `gc` option:application
+
+      iex> use Reactive
+      iex> Reactive.Supervisor.ensure_started()
+      iex> ref = Ref.new(0, gc: false)
+      iex> Reactive.Supervisor.gc()
+      iex> ^ref = Reactive.resolve_process(ref)
+
+      iex> use Reactive
+      iex> Reactive.Supervisor.ensure_started()
+      iex> ref = reactive gc: false do
+      ...>    # some expensive computation
+      ...> end
+      iex> Reactive.Supervisor.gc()
+      iex> ^ref = Reactive.resolve_process(ref)
+  """
   def gc(opts \\ []) do
     name = Keyword.get(opts, :name, Reactive.Supervisor)
     count = opts[:count]
@@ -80,6 +123,25 @@ defmodule Reactive.Supervisor do
     end
   end
 
+  @doc """
+  Trigger computations for any stale reactive processes who have the option `proactive: true`
+
+  Example:
+
+      iex> use Reactive
+      iex> Reactive.Supervisor.ensure_started()
+      iex> num = Ref.new(0)
+      iex> ref =
+      ...>   reactive proactive: true do
+      ...>     get(num) + 1
+      ...>   end
+      iex> Reactive.get_cached(ref)
+      1
+      iex> Ref.set(num, 1)
+      iex> Reactive.Supervisor.trigger_proactive()
+      iex> Reactive.get_cached(ref)
+      2
+  """
   def trigger_proactive(opts \\ []) do
     exclude = opts[:exclude]
 
@@ -96,6 +158,7 @@ defmodule Reactive.Supervisor do
     |> trigger_proactive_call(Keyword.get(opts, :times, 1))
   end
 
+  @doc false
   def trigger_proactive_call(processes, times \\ 1)
 
   def trigger_proactive_call(_processes, 0), do: false

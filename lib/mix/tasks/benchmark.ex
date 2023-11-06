@@ -16,8 +16,9 @@ defmodule Benchmark do
 end
 
 defmodule Mix.Tasks.Benchmark do
-  @moduledoc "Printed when the user requests `mix benchmark`"
-  @shortdoc "Runs benchmarks"
+  @moduledoc false
+  # @moduledoc "Printed when the user requests `mix benchmark`"
+  # @shortdoc "Runs benchmarks"
 
   use Mix.Task
   use Reactive
