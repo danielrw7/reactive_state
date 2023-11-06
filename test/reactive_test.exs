@@ -76,12 +76,12 @@ defmodule ReactiveTest do
 
   test "gc" do
     use Reactive
-    first = Ref.new(0, name: :first)
-    second = Ref.new(1, name: :second)
-    branch = Ref.new(true, name: :branch)
+    first = Ref.new(0)
+    second = Ref.new(1)
+    branch = Ref.new(true)
 
     computed =
-      reactive name: :computed do
+      reactive do
         if get(branch) do
           get(first)
         else
@@ -113,6 +113,7 @@ defmodule ReactiveTest do
     assert !alive?(branch)
     assert alive?(computed)
 
+    # protect process
     ref = Ref.new(0, gc: false)
     assert alive?(ref)
     Reactive.Supervisor.gc()
@@ -126,6 +127,23 @@ defmodule ReactiveTest do
     assert alive?(ref)
     Reactive.Supervisor.gc()
     assert alive?(ref)
+
+    # reactivity still works
+    ref = Ref.new(0)
+
+    computed =
+      reactive gc: false do
+        get(ref) + 1
+      end
+
+    Reactive.get(computed)
+    Reactive.Supervisor.gc()
+    Reactive.Supervisor.gc()
+    assert !alive?(ref)
+    assert alive?(computed)
+
+    Ref.set(ref, 1)
+    assert :stale == Reactive.get_cached(computed)
   end
 
   test "proactive" do
