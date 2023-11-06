@@ -99,17 +99,16 @@ defmodule ReactiveTest do
     assert alive?(branch)
     assert alive?(computed)
 
-    Ref.set(branch, false)
-    assert 1 == Reactive.get(computed)
+    Reactive.Supervisor.gc()
     assert alive?(first)
-    assert alive?(second)
+    assert !alive?(second)
     assert alive?(branch)
     assert alive?(computed)
 
     Reactive.Supervisor.gc(protect: [computed])
     assert !alive?(first)
-    assert alive?(second)
-    assert alive?(branch)
+    assert !alive?(second)
+    assert !alive?(branch)
     assert alive?(computed)
 
     ref = Ref.new(0, gc: false)
@@ -154,6 +153,9 @@ defmodule ReactiveTest do
     # get_cached does not update counter
     Reactive.get_cached(x)
     assert 2 == Reactive.ETS.get(Reactive.ETS.Counter, x)
+
+    Reactive.ETS.reset(Reactive.ETS.Counter)
+    assert nil == Reactive.ETS.get(Reactive.ETS.Counter, x)
   end
 
   def alive?(pid) do

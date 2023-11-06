@@ -27,6 +27,10 @@ defmodule Reactive.ETS do
     :ets.lookup(name, key)
   end
 
+  def get_all(name) do
+    :ets.tab2list(name)
+  end
+
   def set(name, key, value) do
     :ets.insert(name, {key, value})
   end
@@ -46,6 +50,17 @@ defmodule Reactive.ETS do
     case :ets.whereis(name) do
       :undefined -> nil
       _ -> :ets.delete_all_objects(name)
+    end
+  end
+
+  def reset(name) do
+    case :ets.whereis(name) do
+      :undefined ->
+        ensure_started(name)
+
+      _ ->
+        empty(name)
+        ensure_started(name)
     end
   end
 end

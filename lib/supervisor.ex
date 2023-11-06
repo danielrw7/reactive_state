@@ -19,17 +19,43 @@ defmodule Reactive.Supervisor do
 
   def gc(opts \\ []) do
     name = Keyword.get(opts, :name, Reactive.Supervisor)
-    count = Keyword.get(opts, :count)
-    strategy = Keyword.get(opts, :strategy, :usage)
+    count = opts[:count]
+    selection = opts[:random]
+    strategy = Keyword.get(opts, :strategy, :counter)
+
+    no_gc_protect =
+      Reactive.ETS.get_all(Reactive.ETS.ProcessOpts, :no_gc)
+      |> Enum.map(&Reactive.resolve_process(&1 |> elem(1)))
+      |> MapSet.new()
 
     protect =
       case opts[:protect] do
-        nil -> nil
-        [] -> nil
+        nil -> MapSet.new()
+        [] -> MapSet.new()
         pids -> pids |> Enum.map(&Reactive.resolve_process/1) |> MapSet.new()
       end
+      |> MapSet.union(no_gc_protect)
 
     children = DynamicSupervisor.which_children(name)
+
+    {children, protect} =
+      case strategy do
+        :counter ->
+          {
+            children,
+            Reactive.ETS.get_all(Reactive.ETS.Counter)
+            |> Enum.map(&elem(&1, 0))
+            |> Enum.map(&Reactive.resolve_process/1)
+            |> MapSet.new()
+            |> MapSet.union(protect)
+          }
+
+        _ ->
+          {
+            children,
+            protect
+          }
+      end
 
     children =
       case protect do
@@ -39,16 +65,18 @@ defmodule Reactive.Supervisor do
       end
 
     children =
-      case {count, strategy} do
+      case {count, selection} do
         {nil, _} -> children
-        {count, true} -> Enum.take_random(children, count)
+        {count, :random} -> Enum.take_random(children, count)
         {count, _} -> Enum.take(children, count)
       end
 
     for {_, child, _, _} <- children do
-      if Reactive.can_gc?(child) do
-        DynamicSupervisor.terminate_child(Reactive.Supervisor, child)
-      end
+      DynamicSupervisor.terminate_child(Reactive.Supervisor, child)
+    end
+
+    if opts[:reset] != false do
+      Reactive.ETS.reset(Reactive.ETS.Counter)
     end
   end
 

@@ -92,12 +92,16 @@ defmodule Reactive do
   end
 
   @doc false
-  def start_link({method, name, _opts} = args) when is_function(method) do
+  def start_link({method, name, opts} = args) when is_function(method) do
     with {:ok, pid} <- GenServer.start_link(__MODULE__, args) do
       name = name || pid
 
       Reactive.ETS.ensure_started()
       Reactive.ETS.set(Reactive.ETS.Method, name, method)
+
+      if opts[:gc] == false do
+        Reactive.ETS.set(Reactive.ETS.ProcessOpts, :no_gc, name)
+      end
 
       if name != pid do
         Reactive.ETS.set(Reactive.ETS.Process, name, pid)
@@ -121,7 +125,7 @@ defmodule Reactive do
   def new(method, opts \\ []) when is_function(method) do
     name = opts[:name]
 
-    if !opts[:supervisor] do
+    if opts[:supervisor] == nil do
       Reactive.Supervisor.ensure_started()
     end
 
@@ -333,14 +337,6 @@ defmodule Reactive do
   end
 
   @doc false
-  def can_gc?(pid) do
-    case Reactive.resolve_process(pid) do
-      nil -> false
-      pid -> GenServer.call(pid, {:can_gc?})
-    end
-  end
-
-  @doc false
   @impl true
   def init({method, name, opts}) when is_function(method) do
     name = name || self()
@@ -459,22 +455,6 @@ defmodule Reactive do
     {:reply, state, full_state}
   end
 
-  @doc false
-  @impl true
-  def handle_call({:can_gc?}, _, %Reactive{state: :stale, opts: opts} = full_state) do
-    {:reply, Keyword.get(opts, :gc, true), full_state}
-  end
-
-  @impl true
-  def handle_call({:can_gc?}, _, %Reactive{opts: opts} = full_state) do
-    if Keyword.get(opts, :gc, true) do
-      listeners = valid_listeners(full_state.listeners)
-      {:reply, map_size(listeners) == 0, %{full_state | listeners: listeners}}
-    else
-      {:reply, false, full_state}
-    end
-  end
-
   @impl true
   def handle_call({:get_call_id}, _, %Reactive{call_id: call_id} = full_state) do
     {:reply, call_id, full_state}
@@ -521,32 +501,5 @@ defmodule Reactive do
       :stale -> method.(call_id)
       _ -> state
     end
-  end
-
-  @doc false
-  defp valid_listeners(listeners) when is_map(listeners) do
-    listeners
-    |> Enum.to_list()
-    |> valid_listeners()
-  end
-
-  defp valid_listeners(lst, valid \\ [])
-
-  defp valid_listeners([check | rest], valid) do
-    {pid, expected_call_id} = check
-
-    if expected_call_id != get_call_id(pid) do
-      valid_listeners(rest, valid)
-    else
-      valid_listeners(rest, [check | valid])
-    end
-  end
-
-  defp valid_listeners([], valid) do
-    Enum.into(valid, %{})
-  end
-
-  defp valid_listeners(map, valid) when is_map(map) and map_size(map) == 0 do
-    Enum.into(valid, %{})
   end
 end
