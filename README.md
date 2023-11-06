@@ -9,7 +9,7 @@ The package can be installed by adding `reactive_state` to your list of dependen
 ```elixir
 def deps do
   [
-    {:reactive_state, "~> 0.2.0"}
+    {:reactive_state, "~> 0.2.1"}
   ]
 end
 ```
@@ -129,7 +129,7 @@ Reactive.Supervisor.gc()
 nil == Reactive.resolve_process(ref)
 ```
 
-Reactive processes can be protected with the `gc` option:application
+Reactive processes can be protected with the `gc` option:
 
 ```elixir
 use Reactive

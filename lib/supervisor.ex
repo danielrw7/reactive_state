@@ -44,7 +44,7 @@ defmodule Reactive.Supervisor do
       iex> Reactive.Supervisor.gc()
       iex> nil == Reactive.resolve_process(ref)
 
-  Reactive processes can be protected with the `gc` option:application
+  Reactive processes can be protected with the `gc` option:
 
       iex> use Reactive
       iex> Reactive.Supervisor.ensure_started()

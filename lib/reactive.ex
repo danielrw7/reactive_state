@@ -9,7 +9,7 @@ defmodule Reactive do
   ```elixir
   def deps do
     [
-      {:reactive_state, "~> 0.2.0"}
+      {:reactive_state, "~> 0.2.1"}
     ]
   end
   ```
@@ -105,7 +105,7 @@ defmodule Reactive do
       iex> Reactive.Supervisor.gc()
       iex> nil == Reactive.resolve_process(ref)
 
-  Reactive processes can be protected with the `gc` option:application
+  Reactive processes can be protected with the `gc` option:
 
       iex> use Reactive
       iex> Reactive.Supervisor.ensure_started()
@@ -120,6 +120,21 @@ defmodule Reactive do
       ...> end
       iex> Reactive.Supervisor.gc()
       iex> ^ref = Reactive.resolve_process(ref)
+
+  ## Named Process
+
+  You can name a reactive process using the `name` option:
+
+      iex> use Reactive
+      iex> Reactive.Supervisor.ensure_started()
+      iex> Ref.new(0, name: MyApp.Value)
+      iex> reactive name: MyApp.Computed do
+      ...>   get(MyApp.Value) + 1
+      ...> end
+      iex> Ref.get(MyApp.Value)
+      0
+      iex> Reactive.get(MyApp.Computed)
+      1
 
   ## Proactive Process
 
@@ -218,6 +233,18 @@ defmodule Reactive do
     name || pid
   end
 
+  @doc """
+  Find a reactive process from a pid or alias.
+
+      iex> pid = Ref.new(0, name: MyApp.Value)
+      iex> true = Reactive.resolve_process(MyApp.Value) == Reactive.resolve_process(pid)
+
+  You can ensure a process will be returned by passing the `create: true` option
+
+  ```elixir
+  Reactive.resolve_process(pid, create: true)
+  ```
+  """
   def resolve_process(pid, opts \\ []) do
     name = pid
 
@@ -275,17 +302,25 @@ defmodule Reactive do
       iex> Ref.set(ref, 3)
       iex> Reactive.get(ref_squared)
       9
+
+  ```elixir
+  reactive name: MyApp.SomeValue, gc: false, proactive: true, supervisor: MyApp.DynamicSupervisor do
+    # ...
+  end
+  ```
   """
   defmacro reactive(opts) do
     Reactive.reactive_ast(opts)
   end
 
+  @doc false
   defmacro reactive(opts, do: ast) do
     opts
     |> Keyword.put(:do, ast)
     |> Reactive.reactive_ast()
   end
 
+  @doc false
   def reactive_ast(opts) do
     {ast, opts} = Keyword.pop(opts, :do)
 
