@@ -2,6 +2,9 @@
 
 Elixir library to manage reactive state by using GenServer processes to manage each piece of state and its relationships to other reactive processes
 
+> [!WARNING]  
+> This library is a work in progress and is not production ready.
+
 ## Installation
 
 The package can be installed by adding `reactive_state` to your list of dependencies in `mix.exs`:
