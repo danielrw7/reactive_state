@@ -69,7 +69,6 @@ defmodule Mix.Tasks.Benchmark do
 
     Benchmark.measure "total" do
       {:ok, _} = Reactive.Supervisor.ensure_started()
-      # {:ok, _} = Reactive.Supervisor.ensure_started()
       first = Ref.new(1, name: "ref_#{count}")
 
       [last | rest] =
@@ -87,7 +86,7 @@ defmodule Mix.Tasks.Benchmark do
       end
 
       Benchmark.measure "gc" do
-        Reactive.ETS.reset(Reactive.ETS.Counter)
+        Reactive.ETS.reset({nil, Counter})
 
         rest
         |> Enum.at(round(count / 2))
@@ -101,7 +100,9 @@ defmodule Mix.Tasks.Benchmark do
           Reactive.Supervisor.gc()
         end
 
-        Ref.get(last)
+        Benchmark.measure "gc.recompute_last" do
+          Ref.get(last)
+        end
 
         Benchmark.measure "gc.call" do
           Reactive.Supervisor.gc()
@@ -109,6 +110,12 @@ defmodule Mix.Tasks.Benchmark do
 
         Benchmark.measure "gc.call" do
           Reactive.Supervisor.gc()
+        end
+
+        DynamicSupervisor.count_children(Reactive.Supervisor) |> dbg()
+
+        Benchmark.measure "gc.recompute_last" do
+          Ref.get(last)
         end
 
         DynamicSupervisor.count_children(Reactive.Supervisor) |> dbg()

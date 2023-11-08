@@ -9,7 +9,7 @@ defmodule Reactive do
   ```elixir
   def deps do
     [
-      {:reactive_state, "~> 0.2.1"}
+      {:reactive_state, "~> 0.2.2"}
     ]
   end
   ```
@@ -156,8 +156,8 @@ defmodule Reactive do
   """
 
   defstruct [
+    :pid,
     :method,
-    :name,
     :opts,
     :call_id,
     :state,
@@ -174,23 +174,28 @@ defmodule Reactive do
   end
 
   @doc false
-  def start_link({method, name, opts} = args) when is_function(method) do
-    with {:ok, pid} <- GenServer.start_link(__MODULE__, args) do
-      name = name || pid
+  def new(%Reactive{opts: opts} = full_state) do
+    Reactive.ETS.ensure_started({opts[:ets_base], :all})
 
-      Reactive.ETS.ensure_started()
-      Reactive.ETS.set(Reactive.ETS.Method, name, method)
-
-      if opts[:gc] == false do
-        Reactive.ETS.set(Reactive.ETS.ProcessOpts, :no_gc, name)
+    supervisor_pid =
+      case Keyword.get(opts, :supervisor, Reactive.Supervisor) do
+        false -> nil
+        name -> Process.whereis(name)
       end
 
-      if name != pid do
-        Reactive.ETS.set(Reactive.ETS.Process, name, pid)
+    {:ok, pid} =
+      case supervisor_pid do
+        nil ->
+          Reactive.start_link(full_state)
+
+        _ ->
+          DynamicSupervisor.start_child(
+            supervisor_pid,
+            {Reactive, full_state}
+          )
       end
 
-      {:ok, pid}
-    end
+    opts[:name] || pid
   end
 
   @doc """
@@ -205,75 +210,14 @@ defmodule Reactive do
       4
   """
   def new(method, opts \\ []) when is_function(method) do
-    name = opts[:name]
-
-    supervisor_pid =
-      case Keyword.get(opts, :supervisor, Reactive.Supervisor) do
-        false -> nil
-        name -> Process.whereis(name)
-      end
-
-    opts =
-      opts
-      |> Keyword.delete(:name)
-      |> Keyword.delete(:supervisor)
-
-    {:ok, pid} =
-      case supervisor_pid do
-        nil ->
-          Reactive.start_link({method, name, opts})
-
-        _ ->
-          DynamicSupervisor.start_child(
-            supervisor_pid,
-            {Reactive, {method, name, opts}}
-          )
-      end
-
-    name || pid
-  end
-
-  @doc """
-  Find a reactive process from a pid or alias.
-
-      iex> pid = Ref.new(0, name: MyApp.Value)
-      iex> true = Reactive.resolve_process(MyApp.Value) == Reactive.resolve_process(pid)
-
-  You can ensure a process will be returned by passing the `create: true` option
-
-  ```elixir
-  Reactive.resolve_process(pid, create: true)
-  ```
-  """
-  def resolve_process(pid, opts \\ []) do
-    name = pid
-
-    {check, pid} =
-      case is_pid(pid) && Process.alive?(pid) do
-        true -> {false, pid}
-        false -> {true, Reactive.ETS.get(Reactive.ETS.Process, pid)}
-      end
-
-    pid =
-      case {check, pid} do
-        {false, pid} -> pid
-        {true, nil} -> nil
-        {true, pid} -> if Process.alive?(pid), do: pid
-      end
-
-    pid =
-      case {pid, opts[:create]} do
-        {nil, true} ->
-          Reactive.new(Reactive.ETS.get(Reactive.ETS.Method, name),
-            name: name
-          )
-          |> Reactive.resolve_process()
-
-        {pid, _} ->
-          pid
-      end
-
-    pid
+    Reactive.new(%Reactive{
+      pid: nil,
+      method: method,
+      opts: opts,
+      call_id: -1,
+      state: :stale,
+      listeners: %{}
+    })
   end
 
   @doc """
@@ -294,8 +238,8 @@ defmodule Reactive do
 
       iex> use Reactive
       iex> ref = Ref.new(2)
-      iex> ref_squared = Reactive.new(fn call_id ->
-      ...>   Reactive.get(ref, call_id: call_id) ** 2
+      iex> ref_squared = Reactive.new(fn from ->
+      ...>   Reactive.get(ref, from: from) ** 2
       ...> end)
       iex> Reactive.get(ref_squared)
       4
@@ -326,16 +270,45 @@ defmodule Reactive do
 
     quote do
       Reactive.new(
-        fn call_id ->
-          var!(get) = fn ref -> Reactive.Ref.get(ref, call_id: call_id) end
-          value = unquote(Reactive.Macro.traverse(ast))
+        fn from ->
+          var!(get) = fn ref -> Reactive.Ref.get(ref, from: from) end
           # suppress unused variable warning
           var!(get)
-          value
+          unquote(Reactive.Macro.traverse(ast))
         end,
         unquote(opts)
       )
     end
+  end
+
+  @doc """
+  Find a reactive process from a pid or alias.
+
+      iex> pid = Ref.new(0, name: MyApp.Value)
+      iex> true = Reactive.resolve_process(MyApp.Value) == Reactive.resolve_process(pid)
+
+  You can ensure a process will be returned by passing the `create: true` option
+
+  ```elixir
+  Reactive.resolve_process(pid, create: true)
+  ```
+  """
+  def resolve_process(name, opts \\ []) do
+    pid = Reactive.ETS.get({opts[:ets_base], State}, name).pid
+    pid = if Process.alive?(pid), do: pid
+
+    pid =
+      case {pid, opts[:create]} do
+        {nil, true} ->
+          Reactive.ETS.get({opts[:ets_base], State}, name)
+          |> Reactive.new()
+          |> Reactive.resolve_process()
+
+        {pid, _} ->
+          pid
+      end
+
+    pid
   end
 
   @doc false
@@ -360,11 +333,18 @@ defmodule Reactive do
       iex> Reactive.get(ref)
       1
   """
-  def set(pid, method) when is_function(method) do
+  def set(pid, method, opts \\ []) when is_function(method) do
     case Reactive.resolve_process(pid) do
-      nil -> Reactive.new(method, name: pid)
-      resolved_pid -> GenServer.call(resolved_pid, {:set, method})
+      nil ->
+        Reactive.ETS.get({opts[:ets_base], State}, pid)
+        |> Map.put(:method, method)
+        |> Reactive.new()
+
+      resolved_pid ->
+        GenServer.call(resolved_pid, {:set, method})
     end
+
+    :ok
   end
 
   @doc """
@@ -377,15 +357,7 @@ defmodule Reactive do
       0
   """
   def get(pid, opts \\ []) do
-    if opts[:counter] != false do
-      Reactive.ETS.counter(Reactive.ETS.Counter, pid)
-    end
-
-    if opts[:call_id] do
-      Reactive.call(pid, {:get, opts[:call_id]})
-    else
-      Reactive.call(pid, {:get_dry})
-    end
+    Reactive.call(pid, {:get, opts})
   end
 
   @doc """
@@ -430,41 +402,50 @@ defmodule Reactive do
   @doc false
   def compute_if_needed(pid) do
     case Reactive.resolve_process(pid) do
-      nil -> :dead
-      pid -> GenServer.call(pid, {:compute_if_needed})
+      nil ->
+        :dead
+
+      pid ->
+        GenServer.call(pid, {:compute_if_needed})
     end
   end
 
   @doc false
-  @impl true
-  def init({method, name, opts}) when is_function(method) do
-    name = name || self()
+  def start_link(%Reactive{} = full_state) do
+    GenServer.start_link(__MODULE__, full_state)
+  end
 
-    state = %Reactive{
-      method: method,
-      name: name,
-      opts: opts,
-      call_id: 0,
-      state: :stale,
-      listeners: %{}
+  @doc false
+  @impl true
+  def init(%Reactive{opts: opts, call_id: call_id} = full_state) do
+    opts =
+      opts
+      |> Keyword.put_new(:name, self())
+
+    full_state = %Reactive{
+      full_state
+      | pid: self(),
+        opts: opts,
+        call_id: call_id + 1
     }
 
-    if opts[:proactive] do
-      if name == self() do
-        Reactive.ETS.set(Reactive.ETS.ProcessOpts, :proactive, name)
-      end
-
-      {
-        :ok,
-        state,
-        {:continue, {:compute, :noreply}}
-      }
-    else
-      {
-        :ok,
-        state
-      }
+    if opts[:gc] == false do
+      Reactive.ETS.set({opts[:ets_base], ProcessOpts}, :no_gc, opts[:name])
     end
+
+    full_state =
+      if opts[:proactive] == true do
+        Reactive.ETS.set({opts[:ets_base], ProcessOpts}, :proactive, opts[:name])
+
+        state = compute(full_state)
+        %Reactive{full_state | state: state}
+      else
+        full_state
+      end
+      |> mark_listeners_stale()
+      |> commit_to_ets()
+
+    {:ok, full_state}
   end
 
   @doc false
@@ -472,11 +453,9 @@ defmodule Reactive do
   def handle_call(
         {:set, method},
         from,
-        %Reactive{name: name, opts: opts, call_id: call_id} = full_state
+        %Reactive{opts: opts, call_id: call_id} = full_state
       )
       when is_function(method) do
-    Reactive.ETS.set(Reactive.ETS.Method, name, method)
-
     {
       :noreply,
       %Reactive{
@@ -523,29 +502,34 @@ defmodule Reactive do
   @doc false
   @impl true
   def handle_call(
-        {:get, dependent_call_id},
-        {from, _},
+        {:get, opts},
+        from,
         %Reactive{listeners: listeners} = full_state
       ) do
     state = compute(full_state)
 
-    {
-      :reply,
-      state,
-      %Reactive{
-        full_state
-        | state: state,
-          listeners: listeners |> Map.put(from, dependent_call_id)
-      }
+    listeners =
+      case opts[:from] do
+        nil ->
+          listeners
+
+        {dependent_name, dependent_call_id} ->
+          listeners |> Map.put(dependent_name, dependent_call_id)
+      end
+
+    new_state = %Reactive{
+      full_state
+      | state: state,
+        listeners: listeners
     }
-  end
 
-  @doc false
-  @impl true
-  def handle_call({:get_dry}, _, full_state) do
-    state = compute(full_state)
+    Reactive.ETS.counter({new_state.opts[:ets_base], Counter}, new_state.opts[:name])
 
-    {:reply, state, %Reactive{full_state | state: state}}
+    {
+      :noreply,
+      new_state,
+      {:continue, {:commit_to_ets, {from, state}}}
+    }
   end
 
   @doc false
@@ -566,7 +550,7 @@ defmodule Reactive do
 
   @impl true
   def handle_call({:compute_if_needed}, _, full_state) do
-    {:reply, :ok, full_state}
+    {:reply, full_state, full_state}
   end
 
   @impl true
@@ -584,9 +568,18 @@ defmodule Reactive do
       :ok = stale(listener)
     end
 
-    state = %Reactive{state | listeners: %{}}
+    {:noreply, %Reactive{state | listeners: %{}}, {:continue, {:commit_to_ets, reply}}}
+  end
 
+  @impl true
+  def handle_continue({:commit_to_ets, reply}, %Reactive{} = state) do
+    {:noreply, commit_to_ets(state), {:continue, {:optional_reply, reply}}}
+  end
+
+  @impl true
+  def handle_continue({:optional_reply, reply}, state) do
     case reply do
+      {from, :state} -> GenServer.reply(from, state)
       {from, args} -> GenServer.reply(from, args)
       _ -> nil
     end
@@ -595,10 +588,23 @@ defmodule Reactive do
   end
 
   @doc false
-  defp compute(%Reactive{method: method, call_id: call_id, state: state}) do
+  defp compute(%Reactive{opts: opts, method: method, call_id: call_id, state: state}) do
     case state do
-      :stale -> method.(call_id)
+      :stale -> method.({opts[:name], call_id})
       _ -> state
     end
+  end
+
+  defp mark_listeners_stale(%Reactive{listeners: listeners} = state) do
+    for listener <- listeners do
+      :ok = stale(listener)
+    end
+
+    %Reactive{state | listeners: listeners}
+  end
+
+  defp commit_to_ets(%Reactive{opts: opts} = state) do
+    Reactive.ETS.set({opts[:ets_base], State}, opts[:name], state)
+    state
   end
 end

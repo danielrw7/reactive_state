@@ -67,7 +67,7 @@ defmodule Reactive.Supervisor do
     strategy = Keyword.get(opts, :strategy, :counter)
 
     no_gc_protect =
-      Reactive.ETS.get_all(Reactive.ETS.ProcessOpts, :no_gc)
+      Reactive.ETS.get_all({opts[:ets_base], ProcessOpts}, :no_gc)
       |> Enum.map(&Reactive.resolve_process(&1 |> elem(1)))
       |> MapSet.new()
 
@@ -86,14 +86,28 @@ defmodule Reactive.Supervisor do
         :counter ->
           {
             children,
-            Reactive.ETS.get_all(Reactive.ETS.Counter)
-            |> Enum.map(&elem(&1, 0))
-            |> Enum.map(&Reactive.resolve_process/1)
+            Reactive.ETS.get_all({nil, Counter})
+            |> Stream.map(&elem(&1, 0))
+            |> Stream.map(&Reactive.resolve_process/1)
             |> MapSet.new()
             |> MapSet.union(protect)
           }
 
-        _ ->
+        :stale ->
+          {
+            children
+            |> Stream.filter(&(Reactive.get_cached(&1) == :stale)),
+            protect
+          }
+
+        :fresh ->
+          {
+            children
+            |> Stream.reject(&(Reactive.get_cached(&1) == :stale)),
+            protect
+          }
+
+        :all ->
           {
             children,
             protect
@@ -102,7 +116,6 @@ defmodule Reactive.Supervisor do
 
     children =
       case protect do
-        nil -> children
         map when map_size(map) == 0 -> children
         _ -> children |> Stream.filter(&(!MapSet.member?(protect, &1 |> elem(1))))
       end
@@ -114,12 +127,14 @@ defmodule Reactive.Supervisor do
         {count, _} -> Enum.take(children, count)
       end
 
-    for {_, child, _, _} <- children do
-      DynamicSupervisor.terminate_child(Reactive.Supervisor, child)
-    end
+    children
+    |> Stream.map(&elem(&1, 1))
+    |> Task.async_stream(&DynamicSupervisor.terminate_child(Reactive.Supervisor, &1))
+    |> Stream.run()
 
-    if opts[:reset] != false do
-      Reactive.ETS.reset(Reactive.ETS.Counter)
+    case opts[:reset] do
+      false -> nil
+      _ -> Reactive.ETS.reset({nil, Counter})
     end
   end
 
@@ -146,9 +161,8 @@ defmodule Reactive.Supervisor do
     exclude = opts[:exclude]
 
     processes =
-      Keyword.get(opts, :name, Reactive.ETS.ProcessOpts)
-      |> Reactive.ETS.get_all(:proactive)
-      |> Stream.map(&Reactive.resolve_process(&1 |> elem(1), create: true))
+      Reactive.ETS.get_all({opts[:ets_base], ProcessOpts}, :proactive)
+      |> Enum.map(&Reactive.resolve_process(&1 |> elem(1), create: true))
       |> Enum.filter(& &1)
 
     case opts[:exclude] do
@@ -165,11 +179,9 @@ defmodule Reactive.Supervisor do
 
   def trigger_proactive_call(processes, times) do
     any_changed =
-      for pid <- processes do
-        Reactive.compute_if_needed(pid)
-      end
-      |> Enum.filter(&(&1 == :changed))
-      |> Enum.any?()
+      processes
+      |> Enum.map(&Reactive.compute_if_needed/1)
+      |> Enum.any?(&(&1 == :changed))
 
     if any_changed do
       trigger_proactive_call(processes, times - 1)

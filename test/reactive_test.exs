@@ -9,7 +9,7 @@ defmodule ReactiveTest do
   end
 
   setup do
-    Reactive.ETS.empty()
+    # Reactive.ETS.empty({nil, :all})
 
     # for {_, pid, _, _} <- DynamicSupervisor.which_children(Reactive.Supervisor) do
     #   DynamicSupervisor.terminate_child(Reactive.Supervisor, pid)
@@ -38,8 +38,8 @@ defmodule ReactiveTest do
         end
       end
 
-    Reactive.get(computed)
-    assert :stale != Reactive.get_cached(computed)
+    assert 0 == Reactive.get(computed)
+    assert 0 == Reactive.get_cached(computed)
     Ref.set(first, 1)
     assert :stale == Reactive.get_cached(computed)
 
@@ -149,33 +149,36 @@ defmodule ReactiveTest do
   test "proactive" do
     use Reactive
     num = Ref.new(0)
+    num2 = Ref.new(1)
 
     ref =
       reactive proactive: true do
-        get(num) + 1
+        get(num) + get(num2)
       end
 
     assert 1 == Reactive.get_cached(ref)
 
     Ref.set(num, 1)
+    assert :stale == Reactive.get_cached(ref)
+
     Reactive.Supervisor.trigger_proactive()
     assert 2 == Reactive.get_cached(ref)
   end
 
   test "counters" do
     x = Ref.new(0)
-    assert nil == Reactive.ETS.get(Reactive.ETS.Counter, x)
+    assert nil == Reactive.ETS.get({nil, Counter}, x)
     Ref.get(x)
-    assert 1 == Reactive.ETS.get(Reactive.ETS.Counter, x)
+    assert 1 == Reactive.ETS.get({nil, Counter}, x)
     Ref.get(x)
-    assert 2 == Reactive.ETS.get(Reactive.ETS.Counter, x)
+    assert 2 == Reactive.ETS.get({nil, Counter}, x)
 
     # get_cached does not update counter
     Reactive.get_cached(x)
-    assert 2 == Reactive.ETS.get(Reactive.ETS.Counter, x)
+    assert 2 == Reactive.ETS.get({nil, Counter}, x)
 
-    Reactive.ETS.reset(Reactive.ETS.Counter)
-    assert nil == Reactive.ETS.get(Reactive.ETS.Counter, x)
+    Reactive.ETS.reset({nil, Counter})
+    assert nil == Reactive.ETS.get({nil, Counter}, x)
   end
 
   def alive?(pid) do
