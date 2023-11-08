@@ -1,6 +1,5 @@
 defmodule Reactive.ETS do
   @moduledoc false
-  require Reactive.ETS
 
   defmacro is_name_tuple(name) do
     quote do
