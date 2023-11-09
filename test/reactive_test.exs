@@ -53,19 +53,18 @@ defmodule ReactiveTest do
 
   test "restart" do
     use Reactive
-    ref = ref(0)
-    DynamicSupervisor.terminate_child(Reactive.Supervisor, ref)
-    val = Ref.get(ref)
-    assert 0 == val
+    value = ref(0)
+    DynamicSupervisor.terminate_child(Reactive.Supervisor, value)
+    assert 0 == Ref.get(value)
   end
 
   test "resolve_process" do
-    ref = ref(0)
-    assert ref == Reactive.resolve_process(ref)
-    DynamicSupervisor.terminate_child(Reactive.Supervisor, ref)
-    assert !alive?(ref)
-    assert Reactive.resolve_process(ref, create: true) |> Process.alive?()
-    assert 0 == Ref.get(ref)
+    value = ref(0)
+    assert value == Reactive.resolve_process(value)
+    DynamicSupervisor.terminate_child(Reactive.Supervisor, value)
+    assert !alive?(value)
+    assert Reactive.resolve_process(value, create: true) |> Process.alive?()
+    assert 0 == Ref.get(value)
   end
 
   test "gc" do
@@ -107,35 +106,35 @@ defmodule ReactiveTest do
     assert alive?(computed)
 
     # protect process
-    ref = ref(0, gc: false)
-    assert alive?(ref)
+    value = ref(0, gc: false)
+    assert alive?(value)
     Reactive.Supervisor.gc()
-    assert alive?(ref)
+    assert alive?(value)
 
-    ref =
+    value =
       reactive gc: false do
         0
       end
 
-    assert alive?(ref)
+    assert alive?(value)
     Reactive.Supervisor.gc()
-    assert alive?(ref)
+    assert alive?(value)
 
     # reactivity still works
-    ref = ref(0)
+    value = ref(0)
 
     computed =
       reactive gc: false do
-        get(ref) + 1
+        get(value) + 1
       end
 
     Reactive.get(computed)
     Reactive.Supervisor.gc()
     Reactive.Supervisor.gc()
-    assert !alive?(ref)
+    assert !alive?(value)
     assert alive?(computed)
 
-    Ref.set(ref, 1)
+    Ref.set(value, 1)
     assert :stale == Reactive.get_cached(computed)
   end
 

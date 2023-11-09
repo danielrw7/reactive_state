@@ -291,14 +291,15 @@ defmodule Reactive do
   @doc false
   def reactive_ast(opts) do
     {ast, opts} = Keyword.pop(opts, :do)
+    {ast, _} = Reactive.Macro.traverse({ast, 0})
 
     quote do
       Reactive.new(
         fn from ->
-          var!(get) = fn ref -> Reactive.Ref.get(ref, from: from) end
+          var!(get) = fn counter, ref -> Reactive.Ref.get(ref, counter: counter, from: from) end
           # suppress unused variable warning
           var!(get)
-          unquote(Reactive.Macro.traverse(ast))
+          unquote(ast)
         end,
         unquote(opts)
       )
