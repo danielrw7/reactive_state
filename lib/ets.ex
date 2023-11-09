@@ -109,6 +109,12 @@ defmodule Reactive.ETS do
     end
   end
 
+  def reset({base, :all}) do
+    reset({base, State})
+    reset({base, ProcessOpts})
+    reset({base, Counter})
+  end
+
   @doc "Reset ETS table"
   def reset(name) when is_name_tuple(name) do
     name = normalize_name(name)

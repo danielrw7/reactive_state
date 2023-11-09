@@ -9,11 +9,11 @@ defmodule ReactiveTest do
   end
 
   setup do
-    # Reactive.ETS.empty({nil, :all})
+    Reactive.ETS.reset({nil, :all})
 
-    # for {_, pid, _, _} <- DynamicSupervisor.which_children(Reactive.Supervisor) do
-    #   DynamicSupervisor.terminate_child(Reactive.Supervisor, pid)
-    # end
+    for {_, pid, _, _} <- DynamicSupervisor.which_children(Reactive.Supervisor) do
+      DynamicSupervisor.terminate_child(Reactive.Supervisor, pid)
+    end
 
     :ok
   end
@@ -179,6 +179,23 @@ defmodule ReactiveTest do
 
     Reactive.ETS.reset({nil, Counter})
     assert nil == Reactive.ETS.get({nil, Counter}, x)
+  end
+
+  use Reactive, macro: :reactive_proactive, ref: :ref_proactive, opts: [proactive: true]
+
+  test "default opts" do
+    Reactive.Supervisor.gc()
+    x = ref_proactive(0)
+
+    y =
+      reactive_proactive do
+        get(x) + 1
+      end
+
+    assert 1 == Reactive.get_cached(y)
+    Ref.set(x, 1)
+    Reactive.Supervisor.trigger_proactive()
+    assert 2 == Reactive.get_cached(y)
   end
 
   def alive?(pid) do

@@ -9,25 +9,24 @@ defmodule Reactive do
   ```elixir
   def deps do
     [
-      {:reactive_state, "~> 0.2.2"}
+      {:reactive_state, "~> 0.2.3"}
     ]
   end
   ```
 
-  ## Working with data directly with `Reactive.Ref`
-
-      iex> ref = Ref.new(0) #PID<0.204.0>
-      iex> Ref.get(ref) # or Ref.get(ref)
-      0
-      iex> Ref.set(ref, 1)
-      :ok
-      iex> Ref.get(ref)
-      1
-
   ## Reactive Block
 
+  To automatically import the `reactive/1` and `reactive/2` macros, you can use `use Reactive` which is the equivalent of:
+
+  ```elixir
+  import Reactive, only: [reactive: 1, reactive: 2]
+  alias Reactive.Ref
+  ```
+
+  Example usage:
+
       iex> use Reactive
-      iex> ref = Ref.new(2)
+      iex> ref = reactive(do: 2)
       iex> ref_squared = reactive do
       ...>   get(ref) ** 2
       ...> end
@@ -36,6 +35,34 @@ defmodule Reactive do
       iex> Ref.set(ref, 3)
       iex> Reactive.get(ref_squared)
       9
+
+  To set options at the module level, you can pass options, for example:
+
+      iex> defmodule ReactiveExample do
+      ...>   use Reactive, macro: :reactive_protected, ref: :ref_protected, opts: [gc: false]
+      ...>
+      ...>   def run do
+      ...>     value = ref_protected(0)
+      ...>     computed = reactive_protected do
+      ...>       get(value) + 1
+      ...>     end
+      ...>     {Ref.get(value), Ref.get(computed)}
+      ...>   end
+      ...> end
+      iex>
+      iex> ReactiveExample.run()
+      {0, 1}
+
+  ## Working with data directly with `Reactive.Ref`
+
+      iex> alias Reactive.Ref
+      iex> ref = Ref.new(0) #PID<0.204.0>
+      iex> Ref.get(ref) # or Ref.get(ref)
+      0
+      iex> Ref.set(ref, 1)
+      :ok
+      iex> Ref.get(ref)
+      1
 
   ### Conditional Branches
 
@@ -164,12 +191,41 @@ defmodule Reactive do
     :listeners
   ]
 
-  use GenServer
+  use GenServer, restart: :transient
 
-  defmacro __using__(_opts) do
-    quote do
-      import Reactive, only: [reactive: 1, reactive: 2]
-      alias Reactive.Ref
+  defmacro __using__(opts) do
+    if opts[:macro] || opts[:opts] do
+      macro = Keyword.get(opts, :macro, :reactive)
+      ref = opts[:ref]
+
+      quote do
+        @default_opts unquote(Keyword.get(opts, :opts, []))
+
+        defmacro unquote(macro)(opts) do
+          Reactive.reactive_ast(opts ++ @default_opts)
+        end
+
+        @doc false
+        defmacro unquote(macro)(opts, do: ast) do
+          opts
+          |> Keyword.put(:do, ast)
+          |> then(&(&1 ++ @default_opts))
+          |> Reactive.reactive_ast()
+        end
+
+        if unquote(ref) do
+          def unquote(ref)(value, opts \\ []) do
+            Reactive.Ref.new(value, opts ++ @default_opts)
+          end
+        end
+
+        alias Reactive.Ref
+      end
+    else
+      quote do
+        import Reactive, only: [reactive: 1, reactive: 2]
+        alias Reactive.Ref
+      end
     end
   end
 
@@ -246,6 +302,13 @@ defmodule Reactive do
       iex> Ref.set(ref, 3)
       iex> Reactive.get(ref_squared)
       9
+  """
+  defmacro reactive(opts) do
+    Reactive.reactive_ast(opts)
+  end
+
+  @doc """
+  Create a reactive process with options:
 
   ```elixir
   reactive name: MyApp.SomeValue, gc: false, proactive: true, supervisor: MyApp.DynamicSupervisor do
@@ -253,11 +316,6 @@ defmodule Reactive do
   end
   ```
   """
-  defmacro reactive(opts) do
-    Reactive.reactive_ast(opts)
-  end
-
-  @doc false
   defmacro reactive(opts, do: ast) do
     opts
     |> Keyword.put(:do, ast)
