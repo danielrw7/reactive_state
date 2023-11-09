@@ -205,7 +205,6 @@ defmodule Reactive do
           Reactive.reactive_ast(opts ++ @default_opts)
         end
 
-        @doc false
         defmacro unquote(macro)(opts, do: ast) do
           opts
           |> Keyword.put(:do, ast)
