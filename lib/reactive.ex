@@ -9,7 +9,7 @@ defmodule Reactive do
   ```elixir
   def deps do
     [
-      {:reactive_state, "~> 0.2.3"}
+      {:reactive_state, "~> 0.2.4"}
     ]
   end
   ```

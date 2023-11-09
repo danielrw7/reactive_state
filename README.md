@@ -12,7 +12,7 @@ The package can be installed by adding `reactive_state` to your list of dependen
 ```elixir
 def deps do
   [
-    {:reactive_state, "~> 0.2.3"}
+    {:reactive_state, "~> 0.2.4"}
   ]
 end
 ```
