@@ -12,7 +12,7 @@ The package can be installed by adding `reactive_state` to your list of dependen
 ```elixir
 def deps do
   [
-    {:reactive_state, "~> 0.2.2"}
+    {:reactive_state, "~> 0.2.3"}
   ]
 end
 ```
@@ -23,9 +23,52 @@ end
 
 ## Examples
 
-### Working with data directly with `Reactive.Ref`
+## Reactive Block
+
+To automatically import the `reactive/1` and `reactive/2` macros, you can use `use Reactive` which is the equivalent of:
 
 ```elixir
+import Reactive, only: [reactive: 1, reactive: 2]
+alias Reactive.Ref
+```
+
+Example usage:
+
+```elixir
+use Reactive
+ref = reactive(do: 2)
+ref_squared = reactive do
+  get(ref) ** 2
+end
+Reactive.get(ref_squared)
+# 4
+Ref.set(ref, 3)
+Reactive.get(ref_squared)
+# 9
+```
+
+To set options at the module level, you can pass options, for example:
+
+```elixir
+defmodule ReactiveExample do
+  use Reactive, macro: :reactive_protected, ref: :ref_protected, opts: [gc: false]
+
+  def run do
+    value = ref_protected(0)
+    computed = reactive_protected do
+      get(value) + 1
+    end
+    {Ref.get(value), Ref.get(computed)}
+  end
+end
+
+ReactiveExample.run()
+# {0, 1}
+```
+
+## Working with data directly with `Reactive.Ref`
+```elixir
+alias Reactive.Ref
 ref = Ref.new(0) #PID<0.204.0>
 Ref.get(ref) # or Ref.get(ref)
 # 0
@@ -33,23 +76,6 @@ Ref.set(ref, 1)
 # :ok
 Ref.get(ref)
 # 1
-```
-
-### Reactive Block
-
-```elixir
-use Reactive
-ref = Ref.new(2)
-ref_squared = reactive do
-  get(ref) ** 2
-end
-
-Reactive.get(ref_squared)
-# 4
-
-Ref.set(ref, 3)
-Reactive.get(ref_squared)
-# 9
 ```
 
 #### Conditional Branches
