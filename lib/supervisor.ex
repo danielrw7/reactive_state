@@ -39,6 +39,7 @@ defmodule Reactive.Supervisor do
 
   Example:
 
+      iex> use Reactive
       iex> Reactive.Supervisor.ensure_started()
       iex> ref = Ref.new(0)
       iex> Reactive.Supervisor.gc()
