@@ -1,7 +1,8 @@
 defmodule ReactiveTest do
   use ExUnit.Case
   require Benchmark
-  use Reactive
+  use Reactive, reactive: :reactive_raw
+  use Reactive, reactive: :reactive, ref: :ref, opts: [supervisor: Reactive.Supervisor]
 
   setup_all do
     Reactive.Supervisor.ensure_started()
@@ -18,16 +19,10 @@ defmodule ReactiveTest do
     :ok
   end
 
-  doctest Reactive
-  doctest Reactive.Ref
-  doctest Reactive.Supervisor
-  doctest Reactive.ETS
-
   test "invalidate" do
-    use Reactive
-    first = Ref.new(0)
-    second = Ref.new(0)
-    branch = Ref.new(true)
+    first = ref(0)
+    second = ref(0)
+    branch = ref(true)
 
     computed =
       reactive do
@@ -58,15 +53,14 @@ defmodule ReactiveTest do
 
   test "restart" do
     use Reactive
-    ref = Ref.new(0)
+    ref = ref(0)
     DynamicSupervisor.terminate_child(Reactive.Supervisor, ref)
     val = Ref.get(ref)
     assert 0 == val
   end
 
   test "resolve_process" do
-    use Reactive
-    ref = Ref.new(0)
+    ref = ref(0)
     assert ref == Reactive.resolve_process(ref)
     DynamicSupervisor.terminate_child(Reactive.Supervisor, ref)
     assert !alive?(ref)
@@ -75,10 +69,9 @@ defmodule ReactiveTest do
   end
 
   test "gc" do
-    use Reactive
-    first = Ref.new(0)
-    second = Ref.new(1)
-    branch = Ref.new(true)
+    first = ref(0)
+    second = ref(1)
+    branch = ref(true)
 
     computed =
       reactive do
@@ -114,7 +107,7 @@ defmodule ReactiveTest do
     assert alive?(computed)
 
     # protect process
-    ref = Ref.new(0, gc: false)
+    ref = ref(0, gc: false)
     assert alive?(ref)
     Reactive.Supervisor.gc()
     assert alive?(ref)
@@ -129,7 +122,7 @@ defmodule ReactiveTest do
     assert alive?(ref)
 
     # reactivity still works
-    ref = Ref.new(0)
+    ref = ref(0)
 
     computed =
       reactive gc: false do
@@ -147,9 +140,8 @@ defmodule ReactiveTest do
   end
 
   test "proactive" do
-    use Reactive
-    num = Ref.new(0)
-    num2 = Ref.new(1)
+    num = ref(0)
+    num2 = ref(1)
 
     ref =
       reactive proactive: true do
@@ -166,7 +158,7 @@ defmodule ReactiveTest do
   end
 
   test "counters" do
-    x = Ref.new(0)
+    x = ref(0)
     assert nil == Reactive.ETS.get({nil, Counter}, x)
     Ref.get(x)
     assert 1 == Reactive.ETS.get({nil, Counter}, x)
@@ -181,7 +173,7 @@ defmodule ReactiveTest do
     assert nil == Reactive.ETS.get({nil, Counter}, x)
   end
 
-  use Reactive, macro: :reactive_proactive, ref: :ref_proactive, opts: [proactive: true]
+  use Reactive, reactive: :reactive_proactive, ref: :ref_proactive, opts: [proactive: true]
 
   test "default opts" do
     Reactive.Supervisor.gc()

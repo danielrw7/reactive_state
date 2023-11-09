@@ -23,7 +23,7 @@ end
 
 ## Examples
 
-## Reactive Block
+### Reactive Block
 
 To automatically import the `reactive/1` and `reactive/2` macros, you can use `use Reactive` which is the equivalent of:
 
@@ -51,7 +51,7 @@ To set options at the module level, you can pass options, for example:
 
 ```elixir
 defmodule ReactiveExample do
-  use Reactive, macro: :reactive_protected, ref: :ref_protected, opts: [gc: false]
+  use Reactive, reactive: :reactive_protected, ref: :ref_protected, opts: [gc: false]
 
   def run do
     value = ref_protected(0)
@@ -66,7 +66,7 @@ ReactiveExample.run()
 # {0, 1}
 ```
 
-## Working with data directly with `Reactive.Ref`
+### Working with data directly with `Reactive.Ref`
 ```elixir
 alias Reactive.Ref
 ref = Ref.new(0) #PID<0.204.0>
@@ -78,65 +78,35 @@ Ref.get(ref)
 # 1
 ```
 
-#### Conditional Branches
-
-```elixir
-use Reactive
-if_false = Ref.new(1)
-if_true = Ref.new(2)
-toggle = Ref.new(false)
-computed = reactive do
-  if get(toggle) do
-    get(if_true)
-  else
-    get(if_false)
-  end
-end
-
-Reactive.get(computed)
-# 1
-Ref.set(toggle, true)
-# :ok
-Reactive.get(computed)
-# 2
-
-# Now, updating `if_false` will not require a recomputation
-Ref.set(if_false, 0)
-# :ok
-Reactive.get_cached(computed)
-# 2
-
-# Updating `if_true` will require a recomputation
-Ref.set(if_true, 3)
-# :ok
-Reactive.get_cached(computed)
-# :stale
-Reactive.get(computed)
-# 3
-```
-
 ### Supervisor
 
-By default, new reactive processes will be started under the DynamicSupervisor `Reactive.Supervisor`,
-if that supervisor exists. If not, the reactive process will be created under the current process.
-
-To override this behavior, pass the `supervisor` keyword arg during process creation:
+By default, new reactive processes will be linked to the current process.
+To override this behavior, pass the `supervisor` keyword arg with the name of your `DynamicSupervisor` during process creation:
 
 ```elixir
 value = Ref.new(0, supervisor: MyApp.Supervisor)
-ref = reactive supervisor: MyApp.Supervisor do
+computed = reactive supervisor: MyApp.Supervisor do
   get(value) + 1
 end
 ```
 
-These examples include a method which automatically starts the supervisor for you (`Reactive.Supervisor.ensure_started`),
-but you should set it up in your own supervision tree.
+You can also pass default options like this:
+
+```elixir
+use Reactive, ref: :ref, opts: [supervisor: MyApp.Supervisor]
+...
+value = ref(0)
+computed = reactive do
+  get(value) + 1
+end
+```
 
 ### Process Restarting
 
 If a reactive process has been killed for any reason, it will be restarted upon a `Reactive.get` or `Ref.get` call:
 
 ```elixir
+use Reactive
 Reactive.Supervisor.ensure_started()
 ref = Ref.new(0)
 DynamicSupervisor.terminate_child(Reactive.Supervisor, ref)

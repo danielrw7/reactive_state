@@ -39,7 +39,7 @@ defmodule Reactive do
   To set options at the module level, you can pass options, for example:
 
       iex> defmodule ReactiveExample do
-      ...>   use Reactive, macro: :reactive_protected, ref: :ref_protected, opts: [gc: false]
+      ...>   use Reactive, reactive: :reactive_protected, ref: :ref_protected, opts: [gc: false]
       ...>
       ...>   def run do
       ...>     value = ref_protected(0)
@@ -64,58 +64,30 @@ defmodule Reactive do
       iex> Ref.get(ref)
       1
 
-  ### Conditional Branches
-
-      iex> use Reactive
-      iex> Reactive.Supervisor.ensure_started()
-      iex> if_false = Ref.new(1)
-      iex> if_true = Ref.new(2)
-      iex> toggle = Ref.new(false)
-      iex> computed = reactive do
-      ...>   if get(toggle) do
-      ...>     get(if_true)
-      ...>   else
-      ...>     get(if_false)
-      ...>   end
-      ...> end
-      iex> Reactive.get(computed)
-      1
-      iex> Ref.set(toggle, true)
-      :ok
-      iex> Reactive.get(computed)
-      2
-      iex> # Now, updating `if_false` will not require a recomputation
-      iex> Ref.set(if_false, 0)
-      :ok
-      iex> Reactive.get_cached(computed)
-      2
-      iex> # Updating `if_true` will require a recomputation
-      iex> Ref.set(if_true, 3)
-      :ok
-      iex> Reactive.get_cached(computed)
-      :stale
-      iex> Reactive.get(computed)
-      3
-
   ## Supervisor
 
-  By default, new reactive processes will be started under the DynamicSupervisor `Reactive.Supervisor`,
-  if that supervisor exists. If not, the reactive process will be created under the current process.
-
-  To override this behavior, pass the `supervisor` keyword arg during process creation:
+  By default, new reactive processes will be linked to the current process.
+  To override this behavior, pass the `supervisor` keyword arg with the name of your DynamicSupervisor during process creation:
 
       value = Ref.new(0, supervisor: MyApp.Supervisor)
-      ref = reactive supervisor: MyApp.Supervisor do
+      computed = reactive supervisor: MyApp.Supervisor do
         get(value) + 1
       end
 
-  These examples include a method which automatically starts the supervisor for you (`Reactive.Supervisor.ensure_started`),
-  but you should set it up in your own supervision tree.
+  You can also pass default options like this:
+
+      use Reactive, ref: :ref, opts: [supervisor: MyApp.Supervisor]
+      ...
+      value = ref(0)
+      computed = reactive do
+        get(value) + 1
+      end
 
   ## Process Restarting
 
   If a reactive process has been killed for any reason, it will be restarted upon a `Reactive.get` or `Ref.get` call:
 
+      iex> use Reactive
       iex> Reactive.Supervisor.ensure_started()
       iex> ref = Ref.new(0)
       iex> DynamicSupervisor.terminate_child(Reactive.Supervisor, ref)
@@ -127,6 +99,7 @@ defmodule Reactive do
   The default garbage collection strategy is to kill any processes that were not accessed through
   a `Reactive.get` or `Ref.get` call between GC calls:
 
+      iex> use Reactive
       iex> Reactive.Supervisor.ensure_started()
       iex> ref = Ref.new(0)
       iex> Reactive.Supervisor.gc()
@@ -194,8 +167,8 @@ defmodule Reactive do
   use GenServer, restart: :transient
 
   defmacro __using__(opts) do
-    if opts[:macro] || opts[:opts] do
-      macro = Keyword.get(opts, :macro, :reactive)
+    if opts[:reactive] || opts[:opts] do
+      macro = Keyword.get(opts, :reactive, :reactive)
       ref = opts[:ref]
 
       quote do
@@ -232,20 +205,14 @@ defmodule Reactive do
   def new(%Reactive{opts: opts} = full_state) do
     Reactive.ETS.ensure_started({opts[:ets_base], :all})
 
-    supervisor_pid =
-      case Keyword.get(opts, :supervisor, Reactive.Supervisor) do
-        false -> nil
-        name -> Process.whereis(name)
-      end
-
     {:ok, pid} =
-      case supervisor_pid do
+      case opts[:supervisor] do
         nil ->
           Reactive.start_link(full_state)
 
-        _ ->
+        supervisor ->
           DynamicSupervisor.start_child(
-            supervisor_pid,
+            supervisor,
             {Reactive, full_state}
           )
       end
@@ -341,6 +308,7 @@ defmodule Reactive do
   @doc """
   Find a reactive process from a pid or alias.
 
+      iex> use Reactive
       iex> pid = Ref.new(0, name: MyApp.Value)
       iex> true = Reactive.resolve_process(MyApp.Value) == Reactive.resolve_process(pid)
 
